@@ -1,0 +1,13 @@
+{application, p2p_server,
+ [{description, "p2p_server"},
+  {vsn, "0.1.0"},
+  {registered, [p2p_server_sup]},
+  {applications, [kernel, stdlib]},
+  {env, [
+    {connection_timout, 20000}, % in milliseconds
+    {keep_alive_timer, 180000}, % in milliseconds
+    {init_worker_count, 3},
+    {tcp_port, 40040},
+  ]},
+  {mod, {p2p_server_app, []}}
+ ]}.
