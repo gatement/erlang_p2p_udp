@@ -1,0 +1,11 @@
+{application, p2p_client,
+ [{description, "p2p_client"},
+  {vsn, "0.1.0"},
+  {registered, [p2p_client_sup]},
+  {applications, [kernel, stdlib]},
+  {env, [
+    {keep_alive_timer, 180000}, % in milliseconds
+    {tcp_port, 40040}
+  ]},
+  {mod, {p2p_client_app, []}}
+ ]}.

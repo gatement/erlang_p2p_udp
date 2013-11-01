@@ -7,7 +7,7 @@
     {connection_timout, 20000}, % in milliseconds
     {keep_alive_timer, 180000}, % in milliseconds
     {init_worker_count, 3},
-    {tcp_port, 40040},
+    {tcp_port, 40040}
   ]},
   {mod, {p2p_server_app, []}}
  ]}.
