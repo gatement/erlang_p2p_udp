@@ -1,6 +1,4 @@
--module(p2p_server_handler).
--behaviour(gen_tcp_server).
-%% gen_tcp_server callbacks
+-module(p2p_client_handler).
 -export([
     process_data_online/4, 
     process_data_offline/4, 

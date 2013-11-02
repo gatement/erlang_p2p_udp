@@ -5,6 +5,7 @@
   {applications, [kernel, stdlib]},
   {env, [
     {keep_alive_timer, 180000}, % in milliseconds
+    {tcp_host, "localhost"},
     {tcp_port, 40040}
   ]},
   {mod, {p2p_client_app, []}}

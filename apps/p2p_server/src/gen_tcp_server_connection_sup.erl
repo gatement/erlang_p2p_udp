@@ -14,7 +14,7 @@ start_link(SupName, Callback, Port) ->
     {ok, SupervisorPid} = supervisor:start_link({local, SupName}, ?MODULE, [Callback, Port]),
 
     %% start child servers for connection listening
-    {ok, WorkerCount} = application:get_env(mqtt_broker, init_worker_count),
+    {ok, WorkerCount} = application:get_env(p2p_server, init_worker_count),
     start_children(SupervisorPid, WorkerCount),
 
     {ok, SupervisorPid}.

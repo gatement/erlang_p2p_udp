@@ -43,21 +43,21 @@ init([LSocket, Callback, Parent]) ->
 
 
 handle_call(_Msg, _From, State) ->
-    %error_logger:info_msg("[~p] was called: ~p.~n", [?MODULE, _Msg]),
+    error_logger:info_msg("[~p] was called: ~p.~n", [?MODULE, _Msg]),
     {reply, ok, State}.
 
 
 handle_cast(_Msg, State) ->
-    %error_logger:info_msg("[~P] was casted: ~p.~n", [?MODULE, _Msg]),
+    error_logger:info_msg("[~P] was casted: ~p.~n", [?MODULE, _Msg]),
     {noreply, State}.
 
 
 handle_info({tcp, _Socket, RawData}, State) ->
-    %error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
+    error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
     dispatch(handle_data, RawData, State);
 
 handle_info({tcp_closed, _Socket}, State) ->
-    %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
+    error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
     {stop, tcp_closed, State};
 
 handle_info(timeout, #state{lsocket = LSocket, socket = Socket0, parent = Parent} = State) ->    
@@ -69,6 +69,7 @@ handle_info(timeout, #state{lsocket = LSocket, socket = Socket0, parent = Parent
             %% log
             {ok, {Address, Port}} = inet:peername(Socket),
             {ok, ConnectionTimeout} = application:get_env(connection_timout),
+            error_logger:info_msg("[~p] connected(~p) ~p:~p~n", [?MODULE, Socket, Address, Port]),
             {noreply, State#state{socket = Socket, ip = Address, port = Port}, ConnectionTimeout}; %% this socket must recieve the first message in Timeout seconds
         Socket ->
             case State#state.client_id of
@@ -77,32 +78,32 @@ handle_info(timeout, #state{lsocket = LSocket, socket = Socket0, parent = Parent
                     Ip = State#state.ip,
                     Port = State#state.port,
                     {ok, ConnectionTimeout} = application:get_env(connection_timout),
-                    error_logger:info_msg("disconnected ~p ~p:~p because of the first message doesn't arrive in ~p milliseconds.~n", [Socket, Ip, Port, ConnectionTimeout]),
+                    error_logger:info_msg("[~p] disconnected ~p ~p:~p because of the first message doesn't arrive in ~p milliseconds.~n", [?MODULE, Socket, Ip, Port, ConnectionTimeout]),
                     {stop, connection_timout, State}; %% no message arrived in time so suicide
                 _ ->
                     Ip = State#state.ip,
                     Port = State#state.port,
-                    error_logger:info_msg("disconnected ~p ~p:~p because of the remote has no heartbeat.~n", [Socket, Ip, Port]),
+                    error_logger:info_msg("[~p] disconnected ~p ~p:~p because of the remote has no heartbeat.~n", [?MODULE, Socket, Ip, Port]),
                     {stop, no_heartbeat, State} %% no message arrived in time so suicide
             end
     end;
 
 handle_info({send_tcp_data, Data}, #state{socket = Socket} = State) ->
-    %error_logger:info_msg("[~p] send to socket ~p with data: ~p~n", [?MODULE, Socket, Data]),
+    error_logger:info_msg("[~p] send to socket ~p with data: ~p~n", [?MODULE, Socket, Data]),
     gen_tcp:send(Socket, Data),
     {noreply, State, State#state.keep_alive_timer};
 
 handle_info({stop, Reason}, State) ->
-    %error_logger:info_msg("[~p] process ~p was stopped: ~p~n", [?MODULE, erlang:self(), Reason]),
+    error_logger:info_msg("[~p] process ~p was stopped: ~p~n", [?MODULE, erlang:self(), Reason]),
     {stop, Reason, State};
     
 handle_info(_Msg, State) ->
-    %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, _Msg]),
+    error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, _Msg]),
     {noreply, State, State#state.keep_alive_timer}.
 
 
 terminate(Reason, State) ->
-    %error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
+    error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
     dispatch(terminate, State, Reason),
     ok.
 
@@ -118,16 +119,16 @@ code_change(_OldVsn, State, _Extra) ->
 dispatch(handle_data, RawData, State) ->
     ClientId = case State#state.client_id of
         undefined ->
-            extract_connect_info(RawData);
+            extract_client_id(RawData);
         _ ->
             State#state.client_id 
     end,
 
     case ClientId of
         error ->
-            {stop, signon_err, State};
+            {stop, online_err, State};
         _ ->
-            error_logger:info_msg("client get online(~p - ~p).~n", [erlang:self(), ClientId]),
+            %error_logger:info_msg("[~p] client get online(~p - ~p).~n", [?MODULE, erlang:self(), ClientId]),
             handle_packages(State#state{client_id = ClientId}, RawData)
     end;
 
@@ -146,8 +147,8 @@ handle_packages(State, RawData) ->
         callback = Callback, 
         client_id = ClientId} = State,
 
-    <<TypeCode:1/binary, DataLen:16/integer, _/binary>> = RawData,
-    PackData = binary:part(RawData, 3, DataLen), 
+    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
+    PackData = binary:part(RawData, 2, DataLen), 
 
     Result = case TypeCode of
         <<16#01>> -> 
@@ -164,7 +165,7 @@ handle_packages(State, RawData) ->
 
         <<16#04>> -> 
             error_logger:info_msg("[~p] is pingging (~p)~n", [ClientId, erlang:self()]),
-            gen_tcp:send(Socket, <<16#03, 16#02>>),
+            gen_tcp:send(Socket, <<16#03, 16#01, 16#02>>),
             ok
     end,
 
@@ -173,17 +174,17 @@ handle_packages(State, RawData) ->
             {stop, disconnected, State};
 
         ok ->
-            RestRawData = binary:part(RawData, 3 + DataLen, erlang:byte_size(RawData) - 3 - DataLen),
+            RestRawData = binary:part(RawData, 2 + DataLen, erlang:byte_size(RawData) - 2 - DataLen),
             handle_packages(State, RestRawData)
     end.
 
-extract_connect_info(RawData) ->
-    <<TypeCode:1/binary, DataLen:16/integer, _/binary>> = RawData,
+extract_client_id(RawData) ->
+    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
     ClientId = case TypeCode of
         <<16#01>> -> 
-            erlang:binary_to_list(binary:part(RawData, 3, DataLen));
+            erlang:binary_to_list(binary:part(RawData, 2, DataLen));
         _ ->
             error
     end,
 
-    {ClientId}.
+    ClientId.

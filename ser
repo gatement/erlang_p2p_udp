@@ -1,0 +1,2 @@
+BASE_DIR=/Users/gatement/app/erlang-p2p
+erl -config ${BASE_DIR}/local_ser -pa ${BASE_DIR}/deps/uuid/ebin ${BASE_DIR}/apps/p2p_server/ebin -s p2p_server
