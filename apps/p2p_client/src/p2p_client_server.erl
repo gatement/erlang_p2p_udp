@@ -12,7 +12,6 @@
                }).
 
 -define(SERVER, ?MODULE).
--define(REQ_TIMEOUT, 3000).
 
 %% ===================================================================
 %% API functions
@@ -54,17 +53,18 @@ handle_info({tcp, _Socket, RawData}, State) ->
     dispatch(handle_data, RawData, State);
 
 handle_info({tcp_closed, _Socket}, State) ->
-    error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
+    %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
     {stop, tcp_closed, State};
 
 handle_info(timeout, #state{socket = Socket0} = State) ->    
     case Socket0 of
         undefined ->
-            %do_nothing;
-            {noreply, State};
-        _Socket ->
-            %do_heardbeat
-            {noreply, State}
+            {noreply, State, State#state.keep_alive_timer};
+        Socket ->
+            %% ping req
+            Data = <<16#04, 16#01, 16#00>>,
+            gen_tcp:send(Socket, Data),
+            {noreply, State, State#state.keep_alive_timer}
     end;
 
 handle_info({send_tcp_data, Data}, #state{socket = Socket} = State) ->
@@ -82,7 +82,7 @@ handle_info(_Msg, State) ->
 
 
 terminate(Reason, State) ->
-    error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
+    %error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
     dispatch(terminate, State, Reason),
     ok.
 
@@ -99,7 +99,7 @@ dispatch(handle_data, RawData, State) ->
     handle_recved_packages(State, RawData);
 
 dispatch(terminate, State, Reason) ->
-    #state{socket = Socket, client_id = ClientId} = State,
+    #state{socket=Socket, client_id=ClientId} = State,
     p2p_client_handler:terminate(erlang:self(), Socket, ClientId, Reason),
     ok.
 
@@ -108,38 +108,29 @@ handle_recved_packages(State, <<>>) ->
     {noreply, State, State#state.keep_alive_timer};
 
 handle_recved_packages(State, RawData) ->
-    #state{
-        socket = Socket, 
-        client_id = ClientId} = State,
-
-    <<TypeCode:1/binary, DataLen:16/integer, _/binary>> = RawData,
-    PackData = binary:part(RawData, 3, DataLen), 
+    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
+    PackData = binary:part(RawData, 2, DataLen), 
 
     Result = case TypeCode of
+        %% online resp
         <<16#01>> -> 
-            p2p_client_handler:process_data_online(erlang:self(), Socket, PackData, ClientId),
-            ok;
+            case PackData of
+                <<16#00>> ->
+                    ok;
+                <<16#01>> ->
+                    disconnect
+            end;
 
-        <<16#02>> -> 
-            p2p_client_handler:process_data_offline(erlang:self(), Socket, PackData, ClientId),
-            disconnect;
-
-        <<16#03>> -> 
-            p2p_client_handler:process_data_publish(erlang:self(), Socket, PackData, ClientId),
-            ok;
-
+        %% ping resp
         <<16#04>> -> 
-            error_logger:info_msg("[~p] is pingging (~p)~n", [ClientId, erlang:self()]),
-            gen_tcp:send(Socket, <<16#03, 16#02>>),
             ok
     end,
 
     case Result of
         disconnect ->
             {stop, disconnected, State};
-
         ok ->
-            RestRawData = binary:part(RawData, 3 + DataLen, erlang:byte_size(RawData) - 3 - DataLen),
+            RestRawData = binary:part(RawData, 2 + DataLen, erlang:byte_size(RawData) - 2 - DataLen),
             handle_recved_packages(State, RestRawData)
     end.
 
@@ -150,22 +141,8 @@ handle_connect_req(State, ClientId) ->
     case gen_tcp:connect(ServerHost, ServerPort, [binary, {active, true}]) of
         {ok, Socket} ->
             send_data(Socket, 16#01, ClientId),
-
-            %% waiting for response
-            receive
-                {tcp, Socket, Msg} -> 
-                    error_logger:info_msg("[~p] received tcp data(~p): ~p~n", [?MODULE, Socket, Msg]),
-                    case Msg of
-                        <<16#01, 16#01, 16#00>> ->            
-                            State2 = State#state{socket = Socket, client_id=ClientId},            
-                            {reply, ok, State2};
-                        _ ->
-                            {reply, bad_conn_ack, State}
-                    end
-            after ?REQ_TIMEOUT ->
-                    gen_tcp:close(Socket),
-                    {reply, no_conn_ack, State}
-            end;
+            State2 = State#state{socket=Socket, client_id=ClientId},            
+            {reply, ok, State2};
         _ ->
             {reply, conn_failed, State}
     end.
@@ -176,3 +153,4 @@ send_data(Socket, Cmd, Data) ->
     Data2 = [Cmd, erlang:size(erlang:list_to_binary([Data])), Data],
     gen_tcp:send(Socket, Data2),
     error_logger:info_msg("[~p] sent data(~p): ~p~n", [?MODULE, Socket, Data2]).
+

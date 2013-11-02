@@ -1,0 +1,7 @@
+{application, tools,
+ [{description, "tools"},
+  {vsn, "0.1.4"},
+  {registered, []},
+  {applications, [kernel, stdlib]},
+  {env, [ ]}
+ ]}.

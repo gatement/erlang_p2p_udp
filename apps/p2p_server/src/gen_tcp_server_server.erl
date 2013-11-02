@@ -53,11 +53,11 @@ handle_cast(_Msg, State) ->
 
 
 handle_info({tcp, _Socket, RawData}, State) ->
-    error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
+    %error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
     dispatch(handle_data, RawData, State);
 
 handle_info({tcp_closed, _Socket}, State) ->
-    error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
+    %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
     {stop, tcp_closed, State};
 
 handle_info(timeout, #state{lsocket = LSocket, socket = Socket0, parent = Parent} = State) ->    
@@ -103,7 +103,7 @@ handle_info(_Msg, State) ->
 
 
 terminate(Reason, State) ->
-    error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
+    %error_logger:info_msg("[~p] ~p was terminated with reason: ~p.~n", [?MODULE, State#state.socket, Reason]),
     dispatch(terminate, State, Reason),
     ok.
 
@@ -129,11 +129,11 @@ dispatch(handle_data, RawData, State) ->
             {stop, online_err, State};
         _ ->
             %error_logger:info_msg("[~p] client get online(~p - ~p).~n", [?MODULE, erlang:self(), ClientId]),
-            handle_packages(State#state{client_id = ClientId}, RawData)
+            handle_packages(State#state{client_id=ClientId}, RawData)
     end;
 
 dispatch(terminate, State, Reason) ->
-    #state{callback = Callback, socket = Socket, client_id = ClientId} = State,
+    #state{callback=Callback, socket=Socket, client_id=ClientId} = State,
     Callback:terminate(erlang:self(), Socket, ClientId, Reason),
     ok.
 
@@ -143,7 +143,7 @@ handle_packages(State, <<>>) ->
 
 handle_packages(State, RawData) ->
     #state{
-        socket = Socket, 
+        socket = Socket,
         callback = Callback, 
         client_id = ClientId} = State,
 
@@ -151,21 +151,24 @@ handle_packages(State, RawData) ->
     PackData = binary:part(RawData, 2, DataLen), 
 
     Result = case TypeCode of
+        %% online req
         <<16#01>> -> 
-            Callback:process_data_online(erlang:self(), Socket, PackData, ClientId),
+            Callback:process_data_online(erlang:self(), Socket, ClientId),
             ok;
 
+        %% publish req
         <<16#02>> -> 
-            Callback:process_data_offline(erlang:self(), Socket, PackData, ClientId),
-            disconnect;
-
-        <<16#03>> -> 
             Callback:process_data_publish(erlang:self(), Socket, PackData, ClientId),
             ok;
 
+        %% offline req
+        <<16#03>> -> 
+            disconnect;
+
+        %% ping req
         <<16#04>> -> 
             error_logger:info_msg("[~p] is pingging (~p)~n", [ClientId, erlang:self()]),
-            gen_tcp:send(Socket, <<16#03, 16#01, 16#02>>),
+            gen_tcp:send(Socket, <<16#04, 16#01, 16#00>>),
             ok
     end,
 

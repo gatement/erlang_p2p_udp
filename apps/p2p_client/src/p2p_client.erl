@@ -14,8 +14,8 @@ start() ->
 	application:start(p2p_client).
 
 connect(ClientId) ->
-    Res = gen_server:call(?SERVER, {connect, ClientId}, infinity),
-    io:format("~p~n", [Res]).
+    gen_server:call(?SERVER, {connect, ClientId}, infinity),
+    ok.
 
 
 %% ===================================================================
