@@ -10,7 +10,6 @@
                 tcp_socket,
                 udp_socket,
                 udp_port,
-                peer_client_id,
                 peer_ip,
                 peer_port
                }).
