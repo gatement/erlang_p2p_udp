@@ -143,7 +143,7 @@ handle_recved_packages(State, RawData) ->
             %%% print connected msg
             error_logger:info_msg("[~p] connected to peer ~p.~n", [?MODULE, PeerClientId]),
 
-            {ok, State#state{udp_socket=UdpSocket, udp_port=UdpPort}};
+            {ok, State#state{udp_socket=UdpSocket, udp_port=UdpPort, peer_ip=PeerIp, peer_port=PeerPort}};
 
         %% -- connect4 --------------
         <<16#05>> -> 
