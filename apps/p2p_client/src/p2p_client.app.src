@@ -4,7 +4,6 @@
   {registered, [p2p_client_sup]},
   {applications, [kernel, stdlib]},
   {env, [
-    {keep_alive_timer, 180000}, % in milliseconds
     {tcp_host, "localhost"},
     {tcp_port, 40040}
   ]},
