@@ -140,7 +140,7 @@ handle_recved_packages(State, RawData) ->
             gen_tcp:send(State#state.tcp_socket, SendingData),
 
             %%% print connected msg
-            error_logger:info_msg("[~p] connected to peer ~p.~n", [?MODULE, PeerClientId]),
+            error_logger:info_msg("[~p] connected to peer(~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PeerClientId]),
 
             {ok, State#state{udp_socket=UdpSocket, udp_port=UdpPort, peer_ip=PeerIp, peer_port=PeerPort}};
 
@@ -164,7 +164,7 @@ handle_recved_packages(State, RawData) ->
                     
                     %%% print connected msg
                     PeerClientId = erlang:binary_to_list(PeerClientId0),
-                    error_logger:info_msg("[~p] connected to peer ~p.~n", [?MODULE, PeerClientId]),
+                    error_logger:info_msg("[~p] connected to peer(~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PeerClientId]),
                     %% save peer addr info
                     {ok, State#state{peer_ip=PeerIp, peer_port=PeerPort}}
             end;
