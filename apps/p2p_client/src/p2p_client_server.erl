@@ -129,6 +129,7 @@ handle_recved_packages(State, RawData) ->
             PeerIp = {PeerIp1, PeerIp2, PeerIp3, PeerIp4},
             PeerPort = PeerPortH * 256 + PeerPortL,
             PingData = <<16#06, 16#01, 16#00>>,
+            error_logger:info_msg("[~p] udp ping (~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PingData]),
             gen_udp:send(UdpSocket, PeerIp, PeerPort, PingData),
 
             %%% response (connect3)
@@ -160,6 +161,7 @@ handle_recved_packages(State, RawData) ->
 
                     %% open a hold for incoming msg
                     PingData = <<16#06, 16#01, 16#00>>,
+                    error_logger:info_msg("[~p] udp ping (~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PingData]),
                     gen_udp:send(State#state.udp_socket, PeerIp, PeerPort, PingData),
                     
                     %%% print connected msg
