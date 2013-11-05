@@ -4,8 +4,9 @@
   {registered, [p2p_client_sup]},
   {applications, [kernel, stdlib]},
   {env, [
-    {tcp_host, "localhost"},
-    {tcp_port, 40040}
+    {server_host, "localhost"},
+    {server_port, 40040},
+    {hole_punch_interval, 20000} % in milliseconds
   ]},
   {mod, {p2p_client_app, []}}
  ]}.

@@ -1,12 +1,14 @@
 -module(p2p_server).
+%% API
 -export([start/0]).
 
 
 %% ===================================================================
-%% Application callbacks
+%% API functions
 %% ===================================================================
 
 start() ->
+    db_schema:setup(),
 	application:start(p2p_server).
 
 

@@ -21,8 +21,8 @@ online(ClientId) ->
     ok.
 
 %% connect to another peer
-connect_to_peer(PeerClientId) ->
-    gen_server:call(?SERVER, {connect_to_peer, PeerClientId}),
+connect_to_peer(PeerId) ->
+    gen_server:call(?SERVER, {connect_to_peer, PeerId}),
     ok.
 
 %% send msg to peer

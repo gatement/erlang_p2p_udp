@@ -1,16 +1,21 @@
--module(p2p_client_handler).
--export([terminate/4]).
+-module(p2p_server_app).
+-behaviour(application).
+%% Application callbacks
+-export([start/2, stop/1]).
 
 
 %% ===================================================================
-%% API functions
+%% Application callbacks
 %% ===================================================================
 
-terminate(_SourcePid, _Socket, ClientId, Reason) ->
-    error_logger:info_msg("[~p] process_data_terminate(~p): ~p~n", [?MODULE, ClientId, Reason]).
+start(_StartType, _StartArgs) ->
+    p2p_server_sup:start_link().
+
+
+stop(_State) ->
+    ok.
 
 
 %% ===================================================================
 %% Local Functions
 %% ===================================================================
-

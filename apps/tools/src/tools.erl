@@ -17,7 +17,8 @@
 		record_to_list/2,
 		is_pid_alive/1,
 		show_table/1,
-		binary_to_string/1]).
+		binary_to_string/1,
+        get_local_ip/0]).
 
 -vsn("0.1.4").
 
@@ -176,6 +177,21 @@ show_table(TableName) ->
 
 binary_to_string(Binary) ->
 	lists:flatten([io_lib:format("~2.16.0B", [X]) || <<X:8>> <= Binary]).
+
+
+get_local_ip() ->
+    {ok, AddrList} = inet:getif(),
+    get_local_ip_(AddrList).
+
+get_local_ip_([]) ->
+    error;
+get_local_ip_([Addr | Rest]) ->
+    case Addr of
+        {{127,0,0,1}, _, _} ->
+            get_local_ip_(Rest);
+        {LocalIp, _, _} ->
+            LocalIp
+    end.
 
 
 %% ===================================================================

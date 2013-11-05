@@ -1,13 +1,16 @@
--module(p2p_server).
--export([start/0]).
+-module(p2p_server_server).
+%% API
+-export([start_link/0]).
 
 
 %% ===================================================================
-%% Application callbacks
+%% API functions
 %% ===================================================================
 
-start() ->
-	application:start(p2p_server).
+start_link() ->
+    {ok, Port} = application:get_env(tcp_port),
+    error_logger:info_msg("[~p] start at port: ~p~n", [?MODULE, Port]),
+    gen_tcp_server:start_link(p2p_server, p2p_server_handler, Port).
 
 
 %% ===================================================================

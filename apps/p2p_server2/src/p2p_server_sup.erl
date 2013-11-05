@@ -5,20 +5,28 @@
 %% Supervisor callbacks
 -export([init/1]).
 
+-define(SERVER, ?MODULE).
+
 
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
+
+%% ===================================================================
+%% Supervisor callbacks
+%% ===================================================================
 
 init([]) ->
     Server = {p2p_server_server, {p2p_server_server, start_link, []},
-              permanent, 10000, worker, [p2p_server_server]},
-
-    {ok, {{one_for_one, 300, 100}, [Server]}}.
+              permanent, 1000, supervisor, [p2p_server_server]},
+              
+    Children = [Server],
+    RestartStrategy = {one_for_one, 300, 1},
+    {ok, {RestartStrategy, Children}}.
 
 
 %% ===================================================================
