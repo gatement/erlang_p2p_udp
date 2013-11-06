@@ -1,4 +1,5 @@
 -module(p2p_server_server).
+-include("p2p_server.hrl").
 -behaviour(gen_server).
 %% API
 -export([start_link/0]).
@@ -48,9 +49,9 @@ handle_cast(_Msg, State) ->
 
 
 %% -- info -------------
-handle_info({udp, _UdpSocket, _PeerIp, _PeerPort, RawData}, State) ->
+handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
     error_logger:info_msg("[~p] received udp data: ~p~n", [?MODULE, RawData]),
-    %dispatch(handle_data, RawData, State);
+    handle_data(Ip, Port, RawData, State#state.socket),
     {noreply, State};
 
 handle_info(_Msg, State) ->
@@ -70,3 +71,64 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 %% Local Functions
 %% ===================================================================
+
+handle_data(_, _, <<>>, _) ->
+    ok;
+handle_data(Ip, Port, RawData, Socket) ->
+    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
+    Payload = binary:part(RawData, 2, DataLen), 
+
+    case TypeCode of
+        %% -- online ---------------
+        <<16#01>> -> 
+            handle_data_online(Ip, Port, Payload, Socket);
+
+        %% -- connect req ----------
+        <<16#02>> -> 
+            handle_data_connect_req(Ip, Port, Payload, Socket)
+    end,
+
+    RestRawData = binary:part(RawData, 2 + DataLen, erlang:byte_size(RawData) - 2 - DataLen),
+    handle_data(Ip, Port, RestRawData, Socket).
+
+
+handle_data_online(Ip, Port, Payload, Socket) ->
+    error_logger:info_msg("[~p] client online(~p:~p): ~p~n", [?MODULE, Ip, Port, Payload]),
+    <<LocalIp1:8/integer, LocalIp2:8/integer, LocalIp3:8/integer, LocalIp4:8/integer, LocalPortH:8/integer, LocalPortL:8/integer, ClientIdData/binary>> = Payload,
+
+    LocalIp = {LocalIp1, LocalIp2, LocalIp3, LocalIp4}, 
+    LocalPort = LocalPortH * 256 + LocalPortL,
+
+    <<_ClientIdLen:8/integer, ClientId0/binary>> = ClientIdData,
+    ClientId = erlang:binary_to_list(ClientId0),
+
+    SendingData = case model_run_user:get(ClientId) of
+        undefined ->
+            model_run_user:create(#run_user{
+                    id = ClientId, 
+                    local_ip = LocalIp,
+                    local_port = LocalPort,
+                    public_ip = Ip,
+                    public_port = Port,
+					createdTime = tools:datetime_string('yyyyMMdd_hhmmss')
+            }),
+            %% success
+            <<16#01, 16#01, 16#00>>;
+        _ ->
+            %% Fail
+            <<16#01, 16#01, 16#01>>
+    end,
+
+    gen_udp:send(Socket, Ip, Port, SendingData).
+
+
+handle_data_connect_req(Ip, Port, Payload, _Socket) ->
+    error_logger:info_msg("[~p] connect to peer req(~p:~p): ~p~n", [?MODULE, Ip, Port, Payload]),
+    <<ClientIdLen:8/integer, RestPayload/binary>> = Payload,
+    ClientId = erlang:binary_to_list(binary:part(RestPayload, 0, ClientIdLen)),
+    RestPayload2 = binary:part(RestPayload, ClientIdLen, erlang:byte_size(RestPayload) - ClientIdLen),
+    
+    <<_PeerIdLen:8/integer, PeerId0/binary>> = RestPayload2,
+    PeerId = erlang:binary_to_list(PeerId0),
+
+    ok.

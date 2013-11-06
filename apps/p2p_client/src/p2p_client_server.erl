@@ -65,9 +65,9 @@ handle_call({online, ClientId}, _From, State) ->
     State2 = handle_online_req(State, ClientId),
     {reply, ok, State2};
 
-handle_call({connect_to_peer, _PeerId}, _From, State) ->
-    %handle_connect_to_peer_req(State, PeerClientId);
-    {reply, ok, State};
+handle_call({connect_to_peer, PeerId}, _From, State) ->
+    State2 = handle_connect_to_peer_req(State, PeerId),
+    {reply, ok, State2};
 
 handle_call({send_msg_to_peer, _Msg}, _From, State) ->
     %handle_send_msg_to_peer_req(State, Msg);
@@ -226,12 +226,29 @@ handle_online_req(State, ClientId) ->
     PortH = Port div 256,
 	PortL = Port rem 256,
 
-    SendingDataLen = erlang:size(erlang:list_to_binary([ClientId])) + 6,
-    SendingData = [16#01, SendingDataLen, Ip1, Ip2, Ip3, Ip4, PortH, PortL, ClientId],
+    ClientIdLen = erlang:size(erlang:list_to_binary([ClientId])),
+    SendingDataLen = 7 + ClientIdLen,
+    SendingData = [16#01, SendingDataLen, Ip1, Ip2, Ip3, Ip4, PortH, PortL, ClientIdLen, ClientId],
     gen_udp:send(Socket, ServerHost, ServerPort, SendingData),
 
     State#state{client_id=ClientId}.
 
+
+handle_connect_to_peer_req(State, PeerId) ->
+    #state {
+        server_host = ServerHost,
+        server_port = ServerPort,
+        client_id = ClientId,
+        socket = Socket
+    } = State,
+
+    ClientIdLen = erlang:size(erlang:list_to_binary([ClientId])),
+    PeerIdLen = erlang:size(erlang:list_to_binary([PeerId])),
+    SendingDataLen = 2 + ClientIdLen + PeerIdLen,
+    SendingData = [16#02, SendingDataLen, ClientIdLen, ClientId, PeerIdLen, PeerId],
+    gen_udp:send(Socket, ServerHost, ServerPort, SendingData),
+
+    State.
 
 %handle_connect_to_peer_req(State, PeerClientId) ->
 %    %% create udp socket
