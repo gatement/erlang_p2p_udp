@@ -29,18 +29,3 @@
 
    *. send msg (peer1 <-> peer2)  : 0x05(fix), 1B(left len), Data
 
-
-3. Compile
-   run "./rebar co"
-
-
-4. Usage
-   1) open server via run "./ser" (configure file is "./local_ser.config")
-   2) on peer1 machine, run "./cli" (configure file is "./local_cli.config")
-      then "p2p_client:online("Peer1Name")."
-   3) on peer2 machine, run "./cli"
-      then "p2p_client:online("Peer2Name")."
-      then "p2p_client:connect_to_peer("Peer1Name")."
-   4) happy to send msg via the p2p channel
-      "p2p_client:send_msg("Msg")."
-

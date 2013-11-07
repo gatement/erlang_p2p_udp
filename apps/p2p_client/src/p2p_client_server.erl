@@ -141,11 +141,11 @@ handle_data(Ip, Port, RawData, State) ->
         <<16#02>> -> 
             handle_data_connect_res(Ip, Port, Payload, State);
 
-        %% -- connect res ----------
+        %% -- ping req ----------
         <<16#03>> -> 
             handle_data_ping_req(Ip, Port, Payload, State);
 
-        %% -- connect res ----------
+        %% -- ping res ----------
         <<16#04>> -> 
             handle_data_ping_res(Ip, Port, Payload, State);
 
