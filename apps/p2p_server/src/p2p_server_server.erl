@@ -32,7 +32,7 @@ init([]) ->
         socket = Socket
     },
 
-    error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, State]),
+    %error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, State]),
     {ok, State}.
 
 
@@ -50,7 +50,7 @@ handle_cast(_Msg, State) ->
 
 %% -- info -------------
 handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
-    error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
+    %error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
     handle_data(Ip, Port, RawData, State#state.socket),
     {noreply, State};
 

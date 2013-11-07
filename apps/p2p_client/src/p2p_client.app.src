@@ -7,7 +7,7 @@
     {server_host, "localhost"},
     {server_port, 40040},
     {hole_punch_interval, 3000}, % in milliseconds
-    {max_hole_punch_times, 3}
+    {max_hole_punch_times, 10}
   ]},
   {mod, {p2p_client_app, []}}
  ]}.

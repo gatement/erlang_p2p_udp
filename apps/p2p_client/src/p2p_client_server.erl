@@ -62,7 +62,7 @@ init([]) ->
         client_local_ip = LocalIp
     },
 
-    error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, State]),
+    %error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, State]),
     {ok, State}.
 
 
@@ -94,10 +94,6 @@ handle_cast(_Msg, State) ->
 handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
     %error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
     handle_data(Ip, Port, RawData, State);
-
-handle_info({tcp_closed, _Socket}, State) ->
-    %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
-    {noreply, State};
 
 handle_info(timeout, State) ->
     #state{
@@ -229,7 +225,7 @@ handle_data_recv_msg(Ip, Port, Payload, State) ->
 hole_punch(State) ->
     #state {
         socket = Socket,
-        peer_id = PeerId,
+        peer_id = _PeerId,
         peer_local_ip = PeerLocalIp, 
         peer_local_port = PeerLocalPort,
         peer_public_ip = PeerPublicIp,
@@ -240,10 +236,10 @@ hole_punch(State) ->
     PingReqData = <<16#03, 16#01, 16#00>>,  
 
     gen_udp:send(Socket, PeerLocalIp, PeerLocalPort, PingReqData),
-    error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
+    %error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
 
     gen_udp:send(Socket, PeerPublicIp, PeerPublicPort, PingReqData),
-    error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
+    %error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
 
     State#state{hole_punch_times=HolePunchTimes + 1}.
 
