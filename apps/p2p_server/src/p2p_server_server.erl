@@ -149,10 +149,10 @@ handle_data_connect_req(Ip, Port, Payload, Socket) ->
                     PeerIdLen = erlang:size(erlang:list_to_binary([PeerId])),
 
                     {ClientLocalIp1, ClientLocalIp2, ClientLocalIp3, ClientLocalIp4} = Client#run_user.local_ip, 
-                    {ClientPublicIp1, ClientPublicIp2, ClientPublicIp3, ClientPublicIp4} = Peer#run_user.public_ip, 
+                    {ClientPublicIp1, ClientPublicIp2, ClientPublicIp3, ClientPublicIp4} = Client#run_user.public_ip, 
 
                     {PeerLocalIp1, PeerLocalIp2, PeerLocalIp3, PeerLocalIp4} = Peer#run_user.local_ip, 
-                    {PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4} = Client#run_user.public_ip, 
+                    {PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4} = Peer#run_user.public_ip, 
 
                     ClientLocalPortH = Client#run_user.local_port div 256,
                     ClientLocalPortL = Client#run_user.local_port rem 256,
