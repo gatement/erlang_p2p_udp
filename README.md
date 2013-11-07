@@ -23,14 +23,14 @@ UDP base peer to peer communication.
 
    2) on peer1 machine, run "./cli" (configure file is "./cli.config")
 
-      then "p2p_client:online("Peer1Name")."
+      p2p_client:online("Peer1Name").
       
    3) on peer2 machine, run "./cli"
 
-      then "p2p_client:online("Peer2Name")."
+      p2p_client:online("Peer2Name").
 
-      then "p2p_client:connect_to_peer("Peer1Name")."
+      p2p_client:connect_to_peer("Peer1Name").
 
    4) happy to send msg via the p2p channel
 
-      "p2p_client:send_msg("Msg")."
+      p2p_client:send_msg("Msg").
