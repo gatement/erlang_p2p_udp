@@ -8,3 +8,12 @@ erl_crash.dump
 
 # Vim
 *.swp
+
+# custimized files
+cli
+cli.bat
+ser
+ser.bat
+cli.config
+ser.config
+
