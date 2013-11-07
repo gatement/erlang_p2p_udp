@@ -16,6 +16,8 @@
                 client_local_port,
 
                 peer_id,
+                peer_ip,
+                peer_port,
                 peer_local_ip,
                 peer_local_port,
                 peer_public_ip,
@@ -74,7 +76,7 @@ handle_call({connect_to_peer, PeerId}, _From, State) ->
     {reply, ok, State2};
 
 handle_call({send_msg_to_peer, _Msg}, _From, State) ->
-    %handle_send_msg_to_peer_req(State, Msg);
+    handle_send_msg_to_peer_req(State, Msg);
     {reply, ok, State};
 
 handle_call(_Msg, _From, State) ->
@@ -130,22 +132,30 @@ code_change(_OldVsn, State, _Extra) ->
 %% Local Functions
 %% ===================================================================
 
-handle_data(_Ip, _Port, RawData, State) ->
+handle_data(Ip, Port, RawData, State) ->
     <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
     Payload = binary:part(RawData, 2, DataLen), 
 
     case TypeCode of
         %% -- online res -----------
         <<16#01>> -> 
-            handle_data_online_res(Payload, State);
+            handle_data_online_res(Ip, Port, Payload, State);
 
         %% -- connect res ----------
         <<16#02>> -> 
-            handle_data_connect_res(Payload, State)
+            handle_data_connect_res(Ip, Port, Payload, State);
+
+        %% -- connect res ----------
+        <<16#03>> -> 
+            handle_data_ping_req(Ip, Port, Payload, State);
+
+        %% -- connect res ----------
+        <<16#04>> -> 
+            handle_data_ping_res(Ip, Port, Payload, State)
     end.
 
 
-handle_data_online_res(Payload, State) ->
+handle_data_online_res(_Ip, _Port, Payload, State) ->
     case Payload of
         <<16#00>> ->
             error_logger:info_msg("[~p] online success: ~p.~n", [?MODULE, State#state.client_id]);
@@ -155,7 +165,8 @@ handle_data_online_res(Payload, State) ->
 
     {noreply, State}.
 
-handle_data_connect_res(Payload, State) ->
+
+handle_data_connect_res(_Ip, _Port, Payload, State) ->
     #state {
         hole_punch_interval = HolePunchInterval 
     } = State,
@@ -183,6 +194,29 @@ handle_data_connect_res(Payload, State) ->
     end.
 
 
+handle_data_ping_req(Ip, Port, _Payload, State) ->
+    #state {
+        socket = Socket,
+        hole_punch_interval = HolePunchInterval 
+    } = State,
+
+    PingResData = <<16#04, 16#01, 16#00>>,  
+    gen_udp:send(Socket, Ip, Port, PingResData),
+
+    {noreply, State, HolePunchInterval}.
+
+
+handle_data_ping_res(Ip, Port, _Payload, State) ->
+    #state {
+        peer_id = PeerId 
+    } = State,
+
+    error_logger:info_msg("[~p] ping peer ~p success.~n", [?MODULE, PeerId]),
+
+    State2 = State#state{peer_ip=Ip, peer_port=Port},
+    {noreply, State2}.
+
+
 hole_punch(State) ->
     #state {
         socket = Socket,
@@ -194,117 +228,15 @@ hole_punch(State) ->
         hole_punch_times = HolePunchTimes
     } = State,
 
-    SendingDataPing = <<16#03, 16#01, 16#00>>,  
+    PingReqData = <<16#03, 16#01, 16#00>>,  
 
-    gen_udp:send(Socket, PeerLocalIp, PeerLocalPort, SendingDataPing),
+    gen_udp:send(Socket, PeerLocalIp, PeerLocalPort, PingReqData),
     error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
 
-    gen_udp:send(Socket, PeerPublicIp, PeerPublicPort, SendingDataPing),
+    gen_udp:send(Socket, PeerPublicIp, PeerPublicPort, PingReqData),
     error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
 
     State#state{hole_punch_times=HolePunchTimes + 1}.
-
-
-%dispatch(handle_data, RawData, State) ->
-%    handle_recved_packages(State, RawData);
-%
-%dispatch(terminate, State, Reason) ->
-%    #state{tcp_socket=TcpSocket, client_id=ClientId} = State,
-%    p2p_client_handler:terminate(erlang:self(), TcpSocket, ClientId, Reason),
-%    ok.
-%
-%
-%handle_recved_packages(State, <<>>) ->
-%    {noreply, State};
-%
-%handle_recved_packages(State, RawData) ->
-%    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
-%    Payload = binary:part(RawData, 2, DataLen), 
-%
-%    Result = case TypeCode of
-%        %% -- online res ------------
-%        <<16#01>> -> 
-%            case Payload of
-%                <<16#00>> ->
-%                    error_logger:info_msg("[~p] online success~n", [?MODULE]),
-%                    {ok, State};
-%                <<16#01>> ->
-%                    error_logger:info_msg("[~p] online fail~n", [?MODULE]),
-%                    {ok, State}
-%            end;
-%
-%        %% -- connect2 --------------
-%        <<16#03>> -> 
-%            <<PeerIp1:8/integer, PeerIp2:8/integer, PeerIp3:8/integer, PeerIp4:8/integer, PeerPortH:8/integer, PeerPortL:8/integer, PeerClientId0/binary>> = Payload,
-%
-%            %%% create udp socket
-%            {ok, UdpSocket} = gen_udp:open(0, [binary]),
-%            {ok, UdpPort} = inet:port(UdpSocket),
-%
-%            %%% open a hole for incoming msg
-%            PeerIp = {PeerIp1, PeerIp2, PeerIp3, PeerIp4},
-%            PeerPort = PeerPortH * 256 + PeerPortL,
-%            PingData = <<16#06, 16#01, 16#00>>,
-%            error_logger:info_msg("[~p] udp ping (~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PingData]),
-%            gen_udp:send(UdpSocket, PeerIp, PeerPort, PingData),
-%
-%            %%% response (connect3)
-%            UdpPortH = UdpPort div 256,
-%            UdpPortL = UdpPort rem 256,
-%            PeerClientId = erlang:binary_to_list(PeerClientId0),
-%            SendingDataLen = erlang:size(erlang:list_to_binary([PeerClientId])) + 2,
-%            SendingData = [16#04, SendingDataLen, UdpPortH, UdpPortL, PeerClientId],
-%            gen_tcp:send(State#state.tcp_socket, SendingData),
-%
-%            %%% print connected msg
-%            error_logger:info_msg("[~p] connected to peer(~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PeerClientId]),
-%
-%            {ok, State#state{udp_socket=UdpSocket, udp_port=UdpPort, peer_ip=PeerIp, peer_port=PeerPort}};
-%
-%        %% -- connect4 --------------
-%        <<16#05>> -> 
-%            <<Res:1/binary, RestPayload/binary>> = Payload,
-%            case Res of
-%                <<16#01>> ->
-%                    error_logger:info_msg("[~p] connect to peer failed.~n", [?MODULE]),
-%                    {ok, State};
-%                <<16#00>> ->
-%                    <<PeerIp1:8/integer, PeerIp2:8/integer, PeerIp3:8/integer, PeerIp4:8/integer, PeerPortH:8/integer, PeerPortL:8/integer, PeerClientId0/binary>> = RestPayload,
-%
-%                    %% peer addr info
-%                    PeerIp = {PeerIp1, PeerIp2, PeerIp3, PeerIp4},
-%                    PeerPort = PeerPortH * 256 + PeerPortL,
-%
-%                    %% open a hold for incoming msg
-%                    PingData = <<16#06, 16#01, 16#00>>,
-%                    error_logger:info_msg("[~p] udp ping (~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PingData]),
-%                    gen_udp:send(State#state.udp_socket, PeerIp, PeerPort, PingData),
-%                    
-%                    %%% print connected msg
-%                    PeerClientId = erlang:binary_to_list(PeerClientId0),
-%                    error_logger:info_msg("[~p] connected to peer(~p:~p) ~p.~n", [?MODULE, PeerIp, PeerPort, PeerClientId]),
-%                    %% save peer addr info
-%                    {ok, State#state{peer_ip=PeerIp, peer_port=PeerPort}}
-%            end;
-%
-%        %% -- udp ping -------------
-%        <<16#06>> ->
-%            %% do nothing
-%            {ok, State};
-%
-%        <<16#07>> -> 
-%            error_logger:info_msg("[~p] recv msg(~p:~p): ~p~n", [?MODULE, State#state.peer_ip, State#state.peer_port, erlang:binary_to_list(Payload)]),
-%            {ok, State}
-%    end,
-%
-%    case Result of
-%        {err, Reason, State2} ->
-%            {stop, Reason, State2};
-%
-%        {ok, State2} ->
-%            RestRawData = binary:part(RawData, 2 + DataLen, erlang:byte_size(RawData) - 2 - DataLen),
-%            handle_recved_packages(State2, RestRawData)
-%    end.
 
 
 handle_online_req(State, ClientId) ->
@@ -343,26 +275,17 @@ handle_connect_to_peer_req(State, PeerId) ->
 
     State.
 
-%handle_connect_to_peer_req(State, PeerClientId) ->
-%    %% create udp socket
-%    {ok, UdpSocket} = gen_udp:open(0, [binary]),
-%    {ok, UdpPort} = inet:port(UdpSocket),
-%	UdpPortH = UdpPort div 256,
-%	UdpPortL = UdpPort rem 256,
-%
-%    %% send connect1
-%    SendingDataLen = erlang:size(erlang:list_to_binary([PeerClientId])) + 2,
-%    SendingData = [16#02, SendingDataLen, UdpPortH, UdpPortL, PeerClientId],
-%    gen_tcp:send(State#state.tcp_socket, SendingData),
-%    
-%    %% save udp socket info
-%    {reply, ok, State#state{udp_socket=UdpSocket, udp_port=UdpPort}}.
-%
-%
-%handle_send_msg_to_peer_req(State, Msg) ->
-%    SendingDataLen = erlang:size(erlang:list_to_binary([Msg])),
-%    SendingData = [16#07, SendingDataLen, Msg],
-%    error_logger:info_msg("[~p] sending udp data: ~p~n", [?MODULE, SendingData]),
-%    gen_udp:send(State#state.udp_socket, State#state.peer_ip, State#state.peer_port, SendingData),
-%    {reply, ok, State}.
-%
+
+handle_send_msg_to_peer_req(State, Msg) ->
+    #state {
+        peer_ip = PeerId,
+        peer_port = PeerPort,
+        socket = Socket
+    } = State,
+
+    SendingDataLen = erlang:size(erlang:list_to_binary([Msg])),
+    SendingData = [16#05, SendingDataLen, Msg],
+    error_logger:info_msg("[~p] sending udp data: ~p~n", [?MODULE, SendingData]),
+    gen_udp:send(Socket, PeerId, PeerPort, SendingData),
+
+    {reply, ok, State}.
