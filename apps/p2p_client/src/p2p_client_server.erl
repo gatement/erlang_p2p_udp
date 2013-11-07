@@ -201,6 +201,7 @@ handle_data_ping_req(Ip, Port, _Payload, State) ->
     } = State,
 
     PingResData = <<16#04, 16#01, 16#00>>,  
+    error_logger:info_msg("[~p] pinged by peer ~p:~p.~n", [?MODULE, Ip, Port]),
     gen_udp:send(Socket, Ip, Port, PingResData),
 
     {noreply, State, HolePunchInterval}.
@@ -225,7 +226,7 @@ handle_data_recv_msg(Ip, Port, Payload, State) ->
 hole_punch(State) ->
     #state {
         socket = Socket,
-        peer_id = _PeerId,
+        peer_id = PeerId,
         peer_local_ip = PeerLocalIp, 
         peer_local_port = PeerLocalPort,
         peer_public_ip = PeerPublicIp,
@@ -236,10 +237,10 @@ hole_punch(State) ->
     PingReqData = <<16#03, 16#01, 16#00>>,  
 
     gen_udp:send(Socket, PeerLocalIp, PeerLocalPort, PingReqData),
-    %error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
+    error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
 
     gen_udp:send(Socket, PeerPublicIp, PeerPublicPort, PingReqData),
-    %error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
+    error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
 
     State#state{hole_punch_times=HolePunchTimes + 1}.
 
