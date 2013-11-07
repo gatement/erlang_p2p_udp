@@ -184,6 +184,8 @@ handle_data_connect_res(_Ip, _Port, Payload, State) ->
             HolePunchTimes = 0,
             State2 = State#state{peer_id=PeerId, peer_local_ip=PeerLocalIp, peer_local_port=PeerLocalPort, peer_public_ip=PeerPublicIp, peer_public_port=PeerPublicPort, hole_punch_times=HolePunchTimes},
 
+            error_logger:info_msg("[~p] start pinging: ~p.~n", [?MODULE, State2]),
+
             State3 = hole_punch(State2),
 
             {noreply, State3, HolePunchInterval};
