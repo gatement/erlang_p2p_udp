@@ -21,7 +21,9 @@
                 peer_public_ip,
                 peer_public_port,
 
-                hole_punch_interval
+                hole_punch_interval,
+                hole_punch_times,
+                max_hole_punch_times
                }).
 
 -define(SERVER, ?MODULE).
@@ -43,6 +45,7 @@ init([]) ->
     {ok, ServerHost} = application:get_env(server_host),
     {ok, ServerPort} = application:get_env(server_port),
     {ok, HolePunchInterval} = application:get_env(hole_punch_interval),
+    {ok, MaxHolePunchTimes} = application:get_env(max_hole_punch_times),
     {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, Port} = inet:port(Socket),
     LocalIp = tools:get_local_ip(),
@@ -52,6 +55,7 @@ init([]) ->
         server_port = ServerPort,
         socket = Socket,
         hole_punch_interval = HolePunchInterval,
+        max_hole_punch_times = MaxHolePunchTimes,
         client_local_port = Port,
         client_local_ip = LocalIp
     },
@@ -85,15 +89,29 @@ handle_cast(_Msg, State) ->
 
 
 %% -- info -------------
-handle_info({udp, _UdpSocket, _PeerIp, _PeerPort, RawData}, State) ->
-    error_logger:info_msg("[~p] received udp data: ~p~n", [?MODULE, RawData]),
-    %dispatch(handle_data, RawData, State);
-    {noreply, State};
+handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
+    error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
+    handle_data(Ip, Port, RawData, State);
 
 handle_info({tcp_closed, _Socket}, State) ->
     %error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
     {noreply, State};
-    
+
+handle_info(timeout, State) ->
+    #state{
+       max_hole_punch_times = MaxHolePunchTimes,
+       hole_punch_times = HolePunchTimes,
+       hole_punch_interval = HolePunchInterval
+    } = State,
+
+    if 
+        HolePunchTimes < MaxHolePunchTimes ->
+            State2 = hole_punch(State),
+            {noreply, State2, HolePunchInterval};
+        true ->
+            {noreply, State}
+    end;
+
 handle_info(_Msg, State) ->
     error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, _Msg]),
     {noreply, State}.
@@ -111,6 +129,81 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 %% Local Functions
 %% ===================================================================
+
+handle_data(_Ip, _Port, RawData, State) ->
+    <<TypeCode:1/binary, DataLen:8/integer, _/binary>> = RawData,
+    Payload = binary:part(RawData, 2, DataLen), 
+
+    case TypeCode of
+        %% -- online res -----------
+        <<16#01>> -> 
+            handle_data_online_res(Payload, State);
+
+        %% -- connect res ----------
+        <<16#02>> -> 
+            handle_data_connect_res(Payload, State)
+    end.
+
+
+handle_data_online_res(Payload, State) ->
+    case Payload of
+        <<16#00>> ->
+            error_logger:info_msg("[~p] online success: ~p.~n", [?MODULE, State#state.client_id]);
+        <<16#01>> ->
+            error_logger:info_msg("[~p] online error: ~p.~n", [?MODULE, State#state.client_id])
+    end,
+
+    {noreply, State}.
+
+handle_data_connect_res(Payload, State) ->
+    #state {
+        hole_punch_interval = HolePunchInterval 
+    } = State,
+
+    <<ResultCode:1/binary, RestPayload/binary>> = Payload,
+    case ResultCode of
+        <<16#00>> ->
+            <<PeerLocalIp1:8/integer, PeerLocalIp2:8/integer, PeerLocalIp3:8/integer, PeerLocalIp4:8/integer, PeerLocalPortH:8/integer, PeerLocalPortL:8/integer, PeerPublicIp1:8/integer, PeerPublicIp2:8/integer, PeerPublicIp3:8/integer, PeerPublicIp4:8/integer, PeerPublicPortH:8/integer, PeerPublicPortL:8/integer, _PeerIdLen:8/integer, PeerId0/binary>> = RestPayload,
+            PeerLocalIp = {PeerLocalIp1, PeerLocalIp2, PeerLocalIp3, PeerLocalIp4},
+            PeerPublicIp = {PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4},
+            PeerLocalPort = PeerLocalPortH * 256 + PeerLocalPortL,
+            PeerPublicPort = PeerPublicPortH * 256 + PeerPublicPortL,
+            PeerId = erlang:binary_to_list(PeerId0),
+
+            HolePunchTimes = 0,
+            State2 = State#state{peer_id=PeerId, peer_local_ip=PeerLocalIp, peer_local_port=PeerLocalPort, peer_public_ip=PeerPublicIp, peer_public_port=PeerPublicPort, hole_punch_times=HolePunchTimes},
+
+            State3 = hole_punch(State2),
+
+            {noreply, State3, HolePunchInterval};
+
+        <<16#01>> ->
+            error_logger:info_msg("[~p] connect req error.~n", [?MODULE]),
+            {noreply, State}
+    end.
+
+
+hole_punch(State) ->
+    #state {
+        socket = Socket,
+        peer_id = PeerId,
+        peer_local_ip = PeerLocalIp, 
+        peer_local_port = PeerLocalPort,
+        peer_public_ip = PeerPublicIp,
+        peer_public_port = PeerPublicPort,
+        hole_punch_times = HolePunchTimes
+    } = State,
+
+    SendingDataPing = <<16#03, 16#01, 16#00>>,  
+
+    gen_udp:send(Socket, PeerLocalIp, PeerLocalPort, SendingDataPing),
+    error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerId, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
+
+    gen_udp:send(Socket, PeerPublicIp, PeerPublicPort, SendingDataPing),
+    error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerId, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
+
+    State#state{hole_punch_times=HolePunchTimes + 1}.
+
 
 %dispatch(handle_data, RawData, State) ->
 %    handle_recved_packages(State, RawData);
