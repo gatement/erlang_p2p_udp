@@ -1,6 +1,8 @@
 erlang-p2p
 ==========
 
+UDP base peer to peer communication.
+
 ## Compile
 
    run "./rebar get-deps & ./rebar co"
