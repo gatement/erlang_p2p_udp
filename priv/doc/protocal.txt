@@ -24,8 +24,10 @@
                            success: 0x02(prefix), len(1B), 0x00(result), PeerLocalIp(4B), PeerLocalPort(2B), PeerPublicIp(4B), PeerPublicPort(2B), PeerIdLen(1B), PeerId
                            fail   : 0x02(prefix), len(1B), 0x01(result)
 
-   *. open hole (peer -> peer)    : 0x03(prefix), len(1B), 0x00 
-   *. send msg (peer1 <-> peer2)  : 0x04(prefix), 1B(left len), Data
+   *. ping req (peer -> peer)     : 0x03(prefix), len(1B), 0x00 
+   *. ping res (peer -> peer)     : 0x04(prefix), len(1B), 0x00 
+
+   *. send msg (peer1 <-> peer2)  : 0x05(fix), 1B(left len), Data
 
 
 3. Compile
