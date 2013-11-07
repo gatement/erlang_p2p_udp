@@ -75,8 +75,8 @@ handle_call({connect_to_peer, PeerId}, _From, State) ->
     State2 = handle_connect_to_peer_req(State, PeerId),
     {reply, ok, State2};
 
-handle_call({send_msg_to_peer, _Msg}, _From, State) ->
-    handle_send_msg_to_peer_req(State, Msg);
+handle_call({send_msg_to_peer, Msg}, _From, State) ->
+    handle_send_msg_to_peer_req(State, Msg),
     {reply, ok, State};
 
 handle_call(_Msg, _From, State) ->
@@ -92,7 +92,7 @@ handle_cast(_Msg, State) ->
 
 %% -- info -------------
 handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
-    error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
+    %error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
     handle_data(Ip, Port, RawData, State);
 
 handle_info({tcp_closed, _Socket}, State) ->
@@ -151,7 +151,11 @@ handle_data(Ip, Port, RawData, State) ->
 
         %% -- connect res ----------
         <<16#04>> -> 
-            handle_data_ping_res(Ip, Port, Payload, State)
+            handle_data_ping_res(Ip, Port, Payload, State);
+
+        %% -- recv msg ----------
+        <<16#05>> -> 
+            handle_data_recv_msg(Ip, Port, Payload, State)
     end.
 
 
@@ -215,6 +219,11 @@ handle_data_ping_res(Ip, Port, _Payload, State) ->
 
     State2 = State#state{peer_ip=Ip, peer_port=Port},
     {noreply, State2}.
+
+
+handle_data_recv_msg(Ip, Port, Payload, State) ->
+    error_logger:info_msg("[~p] recv msg(~p:~p): ~p.~n", [?MODULE, Ip, Port, Payload]),
+    {noreply, State}.
 
 
 hole_punch(State) ->
@@ -285,7 +294,6 @@ handle_send_msg_to_peer_req(State, Msg) ->
 
     SendingDataLen = erlang:size(erlang:list_to_binary([Msg])),
     SendingData = [16#05, SendingDataLen, Msg],
-    error_logger:info_msg("[~p] sending udp data: ~p~n", [?MODULE, SendingData]),
     gen_udp:send(Socket, PeerId, PeerPort, SendingData),
 
     {reply, ok, State}.
