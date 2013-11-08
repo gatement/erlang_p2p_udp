@@ -1,2 +1,7 @@
+-- *nix --
 BASE_DIR=/Users/gatement/app/erlang-p2p
 erl -config ${BASE_DIR}/ser -pa ${BASE_DIR}/deps/uuid/ebin ${BASE_DIR}/apps/tools/ebin ${BASE_DIR}/apps/p2p_server/ebin -s p2p_server
+
+-- windows --
+set BASE_DIR=c:/app/erlang-p2p/tcp
+erl -config %BASE_DIR%/ser -pa %BASE_DIR%/deps/uuid/ebin %BASE_DIR%/apps/tools/ebin %BASE_DIR%/apps/p2p_server/ebin -s p2p_server
