@@ -1,18 +1,20 @@
 1. Diagram
 
-                   server
-                    / \
-                   /   \
-                  /     \
-                 /       \
-                /         \ 
-              udp         udp
-              /             \
-             /               \
-            /                 \
-           /                   \
-          /                     \
-       peer1 <------udp------> peer2
+                    server
+
+                  /   / \   \
+                 /   /   \   \
+                /   /     \   \
+               /   /       \   \
+              /   /         \   \ 
+            tcp udp         udp tcp
+            /   /             \   \
+           /   /               \   \
+          /   /                 \   \
+         /   /                   \   \
+        /   /                     \   \
+
+       peer1  <--------udp-------->  peer2
 
 
 2. Protocal
