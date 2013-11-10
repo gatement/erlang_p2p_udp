@@ -1,6 +1,10 @@
 [
 {p2p_client, [
+    {client_id, "lgh"},
     {server_host, "localhost"},
-    {server_port, 40040}
+    {server_tcp_port, 40040},
+    {server_udp_port, 40041},
+    {hole_punch_interval, 3000}, % in milliseconds
+    {max_hole_punch_times, 4}
 ]}
 ].

@@ -1,4 +1,4 @@
--module(p2p_client_sup).
+-module(p2p_server_sup_udp).
 -behaviour(supervisor).
 %% API
 -export([start_link/0]).
@@ -15,10 +15,10 @@ start_link() ->
 
 
 init([]) ->
-    Server = {p2p_client_server, {p2p_client_server, start_link, []},
-              permanent, 10000, worker, [p2p_client_server]},
+    Server = {p2p_server_server_udp, {p2p_server_server_udp, start_link, []},
+              permanent, 10000, worker, [p2p_server_server_udp]},
 
-    {ok, {{one_for_one, 300, 60}, [Server]}}.
+    {ok, {{one_for_one, 1000, 600}, [Server]}}.
 
 
 %% ===================================================================

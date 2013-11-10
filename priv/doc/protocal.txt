@@ -14,20 +14,59 @@
          /   /                   \   \
         /   /                     \   \
 
-       peer1  <--------udp-------->  peer2
+      peer1  <--------udp-------->  peer2
+
+
+2. Workflow
+
+  -------                                  --------                                 -------
+ |       |                                |        |                               |       |
+ | peer1 |                                | server |                               | peer2 |
+ |       |                                |        |                               |       |
+  -------                                  --------                                 -------  
+     v                                        v                                        v
+     |                                        |                                        |
+     |---------- online req [tcp] -------->>--|                                        |
+     |--<<------ online res [tcp] ------------|                                        |
+     |                                        |--<<------ online req [tcp] ------------|
+     |                                        |---------- online res [tcp] -------->>--|
+     |                                        |                                        |
+     |---- send udp info (invite) [udp] -->>--|                                        |       
+     |                                        |---- recv udp info (invite) [tcp] -->>--|
+     |                                        |--<<-- send udp info (accept) [udp] ----|
+     |--<<-- recv udp info (accept) [tcp] ----|                                        |
+     |                                                                                 |
+     |--<<-------------------------- ping local req [udp] -----------------------------|
+     |--<<-------------------------- ping public req [udp] ----------------------------|
+     |------------------------------ ping local req [udp] ------------------------->>--|
+     |------------------------------ ping public req [udp] ------------------------>>--|
+     |------------------------------ ping res [udp] ------------------------------->>--|
+     |--<<-------------------------- ping res [udp] -----------------------------------|
+     |                                                                                 |
+     |------------------------------ send msg [udp] ------------------------------->>--|
+     |--<<-------------------------- send msg [udp] -----------------------------------|
 
 
 2. Protocal
-   *. online req (peer -> server) : 0x01(prefix), len(1B), LocalIp(4B), LocalPort(2B), ClientIdLen(1B), ClientId
-   *. online res (server -> peer) : 0x01(prefix), len(1B), 0x00(success) | 0x01(fail)
+   *. online req (peer -> server) [tcp]: 
+        Len(4B), 0x0001(cmd), ClientIdLen(1B), ClientId
+   *. online res success (server -> peer) [tcp]:
+        Len(4B), 0x0002(cmd), SessionIdLen(1B), SessionId
+   *. online res error (server -> peer) [tcp]:
+        Len(4B), 0x0003(cmd)
 
-   *. connect req (peer -> server): 0x02(prefix), len(1B), ClientIdLen(1B), ClientId, PeerIdLen(1B), PeerId
-   *. connect res (server -> peer): 
-                           success: 0x02(prefix), len(1B), 0x00(result), PeerLocalIp(4B), PeerLocalPort(2B), PeerPublicIp(4B), PeerPublicPort(2B), PeerIdLen(1B), PeerId
-                           fail   : 0x02(prefix), len(1B), 0x01(result)
+   *. send udp info (peer -> server) [udp]:
+        0x0011(cmd), 0x01(invite) | 0x02(accept), LocalIp(4B), LocalUdpPort(2B), SessionIdLen(1B), SessionId, PeerIdLen(1B), PeerId
+   *. send udp info error (server -> peer) [udp] (SessionId or PeerId doesn't exist): 
+        0x0012(cmd)
+   *. recv udp info (server -> peer) [tcp]:
+        Len(4B), 0x0013(cmd), 0x01(invite) | 0x02(accept), PeerLocalIp(4B), PeerLocalUdpPort(2B), PeerPublicIp(4B), PeerPublicUdpPort(2B), PeerIdLen(1B), PeerId
 
-   *. ping req (peer -> peer)     : 0x03(prefix), len(1B), 0x00
-   *. ping res (peer -> peer)     : 0x04(prefix), len(1B), 0x00
+   *. ping req (peer1 -> peer2) [udp]: 
+        0x0021(cmd)
+   *. ping req (peer1 -> peer2) [udp]: 
+        0x0022(cmd)
 
-   *. send msg (peer1 <-> peer2)  : 0x05(fix), 1B(left len), Data
+   *. send msg (peer1 -> peer2) [udp]: 
+        0x0031(cmd), Peer1IdLen(1B), Peer1Id, MsgLen(1B), Msg
 

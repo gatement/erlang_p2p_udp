@@ -11,14 +11,20 @@
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link(?MODULE, []).
 
 
 init([]) ->
-    Server = {p2p_server_server, {p2p_server_server, start_link, []},
-              permanent, 10000, worker, [p2p_server_server]},
+    TcpServer = {p2p_server_sup_tcp, {p2p_server_sup_tcp, start_link, []},
+              permanent, brutal_kill, supervisor, [p2p_server_sup_tcp]},
 
-    {ok, {{one_for_one, 300, 100}, [Server]}}.
+    UdpServer = {p2p_server_sup_udp, {p2p_server_sup_udp, start_link, []},
+              permanent, brutal_kill, supervisor, [p2p_server_sup_udp]},
+
+
+    RestartStrategy = {one_for_one, 1000, 600},
+  
+    {ok, {RestartStrategy, [TcpServer, UdpServer]}}.
 
 
 %% ===================================================================

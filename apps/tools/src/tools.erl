@@ -148,7 +148,8 @@ record_to_list(Record, Attributes) ->
 	Fun = fun(X, Acc) -> 
 		[{erlang:atom_to_list(X), erlang:element(erlang:length(Acc) + 2, Record)} | Acc] 
 	end,
-	lists:foldl(Fun, [], Attributes).
+	List = lists:foldl(Fun, [], Attributes),
+    lists:reverse(List).
 
 
 is_pid_alive(Pid) when node(Pid) =:= node() ->

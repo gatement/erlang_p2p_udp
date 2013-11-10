@@ -11,9 +11,12 @@ erl_crash.dump
 
 # custimized files
 cli
+cli2
 cli.bat
+cli2.bat
+cli.config
+cli2.config
 ser
 ser.bat
-cli.config
 ser.config
 
