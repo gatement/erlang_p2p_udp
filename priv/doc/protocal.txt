@@ -64,8 +64,8 @@
 
    *. ping req (peer1 -> peer2) [udp]: 
         0x0021(cmd)
-   *. ping req (peer1 -> peer2) [udp]: 
-        0x0022(cmd)
+   *. ping res (peer1 -> peer2) [udp]: 
+        0x0022(cmd), ClientIdLen(1B), ClientId
 
    *. send msg (peer1 -> peer2) [udp]: 
         0x0031(cmd), Peer1IdLen(1B), Peer1Id, MsgLen(1B), Msg

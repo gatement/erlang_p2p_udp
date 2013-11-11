@@ -1,7 +1,7 @@
 -module(p2p_client).
 -export([start/0,
         connect/1,
-        send/1
+        send/2
         ]).
 
 -define(SERVER, p2p_client_server).
@@ -22,8 +22,8 @@ connect(PeerId) ->
 
 
 %% send msg to peer
-send(Msg) ->
-    gen_server:call(?SERVER, {send_msg_to_peer, Msg}),
+send(PeerId, Msg) ->
+    gen_server:call(?SERVER, {send_msg_to_peer, PeerId, Msg}),
     ok.
 
 
