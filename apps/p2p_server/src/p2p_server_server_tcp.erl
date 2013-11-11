@@ -50,7 +50,7 @@ handle_cast(_Msg, State) ->
 
 %% -- info -------------
 handle_info({tcp, _Socket, RawData}, State) ->
-    error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
+    %error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
     {ok, State2} = handle_tcp_data(RawData, State),
     {noreply, State2};
 

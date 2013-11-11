@@ -51,7 +51,7 @@ handle_cast(_Msg, State) ->
 
 %% -- info -------------
 handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
-    error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
+    %error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
     {ok, State2} = handle_udp_data(Ip, Port, RawData, State),
     {noreply, State2};
 
@@ -93,121 +93,40 @@ handle_data_send_udp_info(Ip, Port, Payload, State) ->
     SessionId = erlang:binary_to_list(binary:part(RestPayload, 0, SessionIdLen)),
     PeerId = erlang:binary_to_list(binary:part(RestPayload, SessionIdLen + 1, erlang:size(RestPayload) - SessionIdLen - 1)),
 
-    error_logger:info_msg("[~p] debug(~p:~p)~n", [?MODULE, SessionId, PeerId]),
+    %error_logger:info_msg("[~p] handle_data_send_udp_info(localIp: ~p, localUdpPort: ~p, sessionId: ~p, peerId: ~p~n", [?MODULE, LocalIp, LocalUdpPort, SessionId, PeerId]),
 
     case model_run_user:get(SessionId) of
         undefined ->
             %% fail, no such session id (authentication fail)
             SendingData = <<16#00, 16#12>>,
+            error_logger:info_msg("[~p] handle_data_send_udp_info: no such session id ~p.~n", [?MODULE, SessionId]),
             gen_udp:send(Socket, Ip, Port, SendingData);
 
         Client ->
-            case model_run_user:get_by_client_id(PeerId) of
-                undefined ->
-                    %% fail, no such online peer
+            if
+                Client#run_user.client_id =:= PeerId ->
+                    %% fail, because want to connect self
                     SendingData = <<16#00, 16#12>>,
+                    error_logger:info_msg("[~p] handle_data_send_udp_info: want to connect to self ~p.~n", [?MODULE, PeerId]),
                     gen_udp:send(Socket, Ip, Port, SendingData);
-                Peer ->
-                    %% success
-                    ClientId = Client#run_user.client_id,
-                    ClientIdLen = erlang:size(erlang:list_to_binary([ClientId])),
-                    {PublicIp1, PublicIp2, PublicIp3, PublicIp4} = Ip,
-                    EncodedPublicUdpPort = binary:encode_unsigned(Port),
-                    SendingData = [16#00, 16#13, InviteType, LocalIp, LocalUdpPort, PublicIp1, PublicIp2, PublicIp3, PublicIp4, EncodedPublicUdpPort, ClientId, ClientIdLen],
-                    Peer#run_user.pid ! {send_tcp_data, SendingData}
+                true ->
+                    case model_run_user:get_by_client_id(PeerId) of
+                        undefined ->
+                            %% fail, no such online peer
+                            SendingData = <<16#00, 16#12>>,
+                            error_logger:info_msg("[~p] handle_data_send_udp_info: no such online peer ~p.~n", [?MODULE, PeerId]),
+                            gen_udp:send(Socket, Ip, Port, SendingData);
+                        Peer ->
+                            %% success
+                            ClientId = Client#run_user.client_id,
+                            ClientIdLen = erlang:size(erlang:list_to_binary([ClientId])),
+                            {PublicIp1, PublicIp2, PublicIp3, PublicIp4} = Ip,
+                            EncodedPublicUdpPort = binary:encode_unsigned(Port),
+                            SendingData = [16#00, 16#13, InviteType, LocalIp, LocalUdpPort, PublicIp1, PublicIp2, PublicIp3, PublicIp4, EncodedPublicUdpPort, ClientIdLen, ClientId],
+                            %error_logger:info_msg("[~p] handle_data_send_udp_info sending data: ~p~n", [?MODULE, SendingData]),
+                            Peer#run_user.pid ! {send_tcp_data, SendingData}
+                    end
             end
     end,
 
     {ok, State}.
-
-
-%handle_data_online_req(Ip, Port, Payload, Socket) ->
-%    error_logger:info_msg("[~p] client online(~p:~p): ~p~n", [?MODULE, Ip, Port, Payload]),
-%    <<LocalIp1:8/integer, LocalIp2:8/integer, LocalIp3:8/integer, LocalIp4:8/integer, LocalPortH:8/integer, LocalPortL:8/integer, ClientIdData/binary>> = Payload,
-%
-%    LocalIp = {LocalIp1, LocalIp2, LocalIp3, LocalIp4}, 
-%    LocalPort = LocalPortH * 256 + LocalPortL,
-%
-%    <<_ClientIdLen:8/integer, ClientId0/binary>> = ClientIdData,
-%    ClientId = erlang:binary_to_list(ClientId0),
-%
-%    SendingData = case model_run_user:get(ClientId) of
-%        undefined ->
-%            model_run_user:create(#run_user{
-%                    id = ClientId, 
-%                    local_ip = LocalIp,
-%                    local_port = LocalPort,
-%                    public_ip = Ip,
-%                    public_port = Port,
-%					createdTime = tools:datetime_string('yyyyMMdd_hhmmss')
-%            }),
-%            %% success
-%            <<16#01, 16#01, 16#00>>;
-%        _ ->
-%            %% Fail
-%            <<16#01, 16#01, 16#01>>
-%    end,
-%
-%    gen_udp:send(Socket, Ip, Port, SendingData).
-%
-%
-%handle_data_connect_req(Ip, Port, Payload, Socket) ->
-%    error_logger:info_msg("[~p] connect to peer req(~p:~p): ~p~n", [?MODULE, Ip, Port, Payload]),
-%    <<ClientIdLen:8/integer, RestPayload/binary>> = Payload,
-%    ClientId = erlang:binary_to_list(binary:part(RestPayload, 0, ClientIdLen)),
-%    RestPayload2 = binary:part(RestPayload, ClientIdLen, erlang:byte_size(RestPayload) - ClientIdLen),
-%    <<_PeerIdLen:8/integer, PeerId0/binary>> = RestPayload2,
-%    PeerId = erlang:binary_to_list(PeerId0),
-%
-%    case model_run_user:get(ClientId) of
-%        undefined ->
-%            %% ClientId is not online
-%            SendingData = <<16#02, 16#01, 16#01>>,
-%            gen_udp:send(Socket, Ip, Port, SendingData);
-%        error ->
-%            %% db error
-%            SendingData = <<16#02, 16#01, 16#01>>,
-%            gen_udp:send(Socket, Ip, Port, SendingData);
-%        Client ->
-%            case model_run_user:get(PeerId) of
-%                undefined ->
-%                    %% PeerId is not online
-%                    SendingData = <<16#02, 16#01, 16#01>>,
-%                    gen_udp:send(Socket, Ip, Port, SendingData);
-%                error ->
-%                    %% db error
-%                    SendingData = <<16#02, 16#01, 16#01>>,
-%                    gen_udp:send(Socket, Ip, Port, SendingData);
-%                Peer ->
-%                    ClientIdLen = erlang:size(erlang:list_to_binary([ClientId])),
-%                    PeerIdLen = erlang:size(erlang:list_to_binary([PeerId])),
-%
-%                    {ClientLocalIp1, ClientLocalIp2, ClientLocalIp3, ClientLocalIp4} = Client#run_user.local_ip, 
-%                    {ClientPublicIp1, ClientPublicIp2, ClientPublicIp3, ClientPublicIp4} = Client#run_user.public_ip, 
-%
-%                    {PeerLocalIp1, PeerLocalIp2, PeerLocalIp3, PeerLocalIp4} = Peer#run_user.local_ip, 
-%                    {PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4} = Peer#run_user.public_ip, 
-%
-%                    ClientLocalPortH = Client#run_user.local_port div 256,
-%                    ClientLocalPortL = Client#run_user.local_port rem 256,
-%
-%                    ClientPublicPortH = Client#run_user.public_port div 256,
-%                    ClientPublicPortL = Client#run_user.public_port rem 256,
-%
-%                    PeerLocalPortH = Peer#run_user.local_port div 256,
-%                    PeerLocalPortL = Peer#run_user.local_port rem 256,
-%
-%                    PeerPublicPortH = Peer#run_user.public_port div 256,
-%                    PeerPublicPortL = Peer#run_user.public_port rem 256,
-%
-%                    SendingDataLenPeer = 14 + ClientIdLen,
-%                    SendingDataLenClient = 14 + PeerIdLen,
-%
-%                    SendingDataPeer = [16#02, SendingDataLenPeer, 16#00, ClientLocalIp1, ClientLocalIp2, ClientLocalIp3, ClientLocalIp4, ClientLocalPortH, ClientLocalPortL, ClientPublicIp1, ClientPublicIp2, ClientPublicIp3, ClientPublicIp4, ClientPublicPortH, ClientPublicPortL, ClientIdLen, ClientId],
-%
-%                    SendingDataClient = [16#02, SendingDataLenClient, 16#00, PeerLocalIp1, PeerLocalIp2, PeerLocalIp3, PeerLocalIp4, PeerLocalPortH, PeerLocalPortL, PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4, PeerPublicPortH, PeerPublicPortL, PeerIdLen, PeerId],
-%
-%                    gen_udp:send(Socket, Ip, Port, SendingDataClient),
-%                    gen_udp:send(Socket, Peer#run_user.public_ip, Peer#run_user.public_port, SendingDataPeer)
-%            end
-%    end.

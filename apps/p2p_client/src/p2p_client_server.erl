@@ -79,7 +79,8 @@ init([]) ->
         peers = []
     },
 
-    error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, tools:record_to_list(State, record_info(fields, state))]),
+    %error_logger:info_msg("[~p] was started with state ~p.~n", [?MODULE, tools:record_to_list(State, record_info(fields, state))]),
+    error_logger:info_msg("[~p] was started with client id: ~p.~n", [?MODULE, ClientId]),
     {ok, State, 0}.
 
 
@@ -105,18 +106,18 @@ handle_cast(_Msg, State) ->
 
 %% -- info -------------
 handle_info({udp, _UdpSocket, Ip, Port, RawData}, State) ->
-    error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
+    %error_logger:info_msg("[~p] received udp data(~p:~p): ~p~n", [?MODULE, Ip, Port, RawData]),
     {ok, State2} = handle_udp_data(Ip, Port, RawData, State),
     {noreply, State2, 0};
 
 handle_info({tcp, _Socket, RawData}, State) ->
-    error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
+    %error_logger:info_msg("[~p] received tcp data: ~p~n", [?MODULE, RawData]),
     {ok, State2} = handle_tcp_data(RawData, State),
     {noreply, State2, 0};
 
 handle_info({tcp_closed, _Socket}, State) ->
     error_logger:info_msg("[~p] was infoed: ~p.~n", [?MODULE, tcp_closed]),
-    {stop, tcp_closed, State, 0};
+    {noreply, State, 0};
 
 handle_info(timeout, State) ->
     #state{
@@ -189,10 +190,16 @@ handle_tcp_data(RawData, State) ->
             handle_data_recv_upd_info(Payload, State)
     end.
 
+
 handle_udp_data(Ip, Port, RawData, State) ->
     <<Cmd:2/binary, Payload/binary>> = RawData,
 
     case Cmd of
+        %% -- send udp info error ----------
+        <<16#00, 16#12>> -> 
+            error_logger:info_msg("[~p] your session id is invalid or the peer you want ot connect is not online or you want to connect to self.~n", [?MODULE]),
+            {ok, State};
+
         %% -- ping req ----------
         <<16#00, 16#21>> -> 
             handle_data_ping_req(Ip, Port, Payload, State);
@@ -221,7 +228,7 @@ handle_send_msg_to_peer_req(PeerId, Msg, State) ->
 
     case lists:keyfind(PeerId, 2, Peers) of
         false ->
-            error_logger:info_msg("[~p] you must connect to this peer ~p firstly.~n", [?MODULE, PeerId]);
+            error_logger:info_msg("[~p] you must connect to peer ~p firstly.~n", [?MODULE, PeerId]);
         Peer ->
             #peer {
                 peer_ip = PeerIp,
@@ -299,6 +306,8 @@ handle_data_recv_upd_info(Payload, State) ->
     Peers3 = [Peer | Peers2],
     State2 = State#state{peers = Peers3},
             
+    %error_logger:info_msg("[~p] handle_data_recv_upd_info: ~p.~n", [?MODULE, tools:record_to_list(State2, record_info(fields, state))]),
+
     {ok, State2}.
 
 
@@ -335,7 +344,7 @@ handle_data_ping_res(Ip, Port, Payload, State) ->
     Peers3 = [Peer | Peers2],
     State2 = State#state{peers = Peers3},
 
-    error_logger:info_msg("[~p] ping peer ~p success.~n", [?MODULE, PeerId]),
+    error_logger:info_msg("[~p] ping peer ~p success: ~p.~n", [?MODULE, PeerId, tools:record_to_list(State2, record_info(fields, state))]),
 
     {ok, State2}.
 
@@ -343,8 +352,8 @@ handle_data_ping_res(Ip, Port, Payload, State) ->
 handle_data_recv_msg(Ip, Port, Payload, State) ->
     <<PeerIdLen:8/integer, RestPayload/binary>> = Payload,
     PeerId = erlang:binary_to_list(binary:part(RestPayload, 0, PeerIdLen)),
-    MsgLen = erlang:binary_to_integer(binary:part(RestPayload, PeerIdLen, 1)),
-    Msg = erlang:binary_to_list(binary:part(RestPayload, PeerIdLen + 1, MsgLen)),
+    MsgBin = binary:part(RestPayload, PeerIdLen + 1, erlang:size(RestPayload) - PeerIdLen - 1),
+    Msg = erlang:binary_to_list(MsgBin),
 
     error_logger:info_msg("[~p] recv msg(~p:~p:~p): ~p.~n", [?MODULE, PeerId, Ip, Port, Msg]),
     {ok, State}.
@@ -392,10 +401,10 @@ hole_punch(State) ->
                 if 
                     HolePunchTimes < MaxHolePunchTimes ->
                         gen_udp:send(UdpSocket, PeerLocalIp, PeerLocalPort, PingReqData),
-                        error_logger:info_msg("[~p] ping ~p (local:~p:~p): ~p.~n", [?MODULE, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
+                        error_logger:info_msg("[~p] ping (local:~p:~p): ~p.~n", [?MODULE, PeerLocalIp, PeerLocalPort, HolePunchTimes]),
 
                         gen_udp:send(UdpSocket, PeerPublicIp, PeerPublicPort, PingReqData),
-                        error_logger:info_msg("[~p] ping ~p (public:~p:~p): ~p.~n", [?MODULE, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
+                        error_logger:info_msg("[~p] ping (public:~p:~p): ~p.~n", [?MODULE, PeerPublicIp, PeerPublicPort, HolePunchTimes]),
 
                         Peer#peer{hole_punch_times = HolePunchTimes + 1};
                     true ->
