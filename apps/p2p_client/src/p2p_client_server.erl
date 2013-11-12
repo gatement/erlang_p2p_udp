@@ -306,7 +306,7 @@ handle_data_recv_upd_info(Payload, State) ->
     Peers3 = [Peer | Peers2],
     State2 = State#state{peers = Peers3},
             
-    %error_logger:info_msg("[~p] handle_data_recv_upd_info: ~p.~n", [?MODULE, tools:record_to_list(State2, record_info(fields, state))]),
+    error_logger:info_msg("[~p] handle_data_recv_upd_info: ~p.~n", [?MODULE, tools:record_to_list(State2, record_info(fields, state))]),
 
     {ok, State2}.
 
