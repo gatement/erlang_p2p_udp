@@ -296,6 +296,8 @@ handle_data_recv_upd_info(Payload, State) ->
     Peers2 = lists:keydelete(PeerId, 2, Peers),
     Peer = #peer{
         peer_id = PeerId,
+        peer_ip = undefined,
+        peer_udp_port = undefined,
         peer_local_ip = {PeerLocalIp1, PeerLocalIp2, PeerLocalIp3, PeerLocalIp4},
         peer_local_port = PeerLocalUdpPort,
         peer_public_ip = {PeerPublicIp1, PeerPublicIp2, PeerPublicIp3, PeerPublicIp4},
@@ -334,14 +336,31 @@ handle_data_ping_res(Ip, Port, Payload, State) ->
     <<_PeerIdLen:8/integer, PeerId0/binary>> = Payload,
     PeerId = erlang:binary_to_list(PeerId0),
 
+    Peer = lists:keyfind(PeerId, 2, Peers),
+    Peer2 = case Peer#peer.peer_ip of
+                undefined ->
+                    Peer#peer{
+                        peer_id = PeerId,
+                        peer_ip = Ip,
+                        peer_udp_port = Port,
+                        is_hole_punching = false
+                    };
+                _ ->
+                    if
+                        Ip =:= Peer#peer.peer_local_ip ->
+                            Peer#peer{
+                                peer_id = PeerId,
+                                peer_ip = Ip,
+                                peer_udp_port = Port,
+                                is_hole_punching = false
+                            };
+                        true ->
+                            Peer
+                    end
+            end,
+
     Peers2 = lists:keydelete(PeerId, 2, Peers),
-    Peer = #peer{
-        peer_id = PeerId,
-        peer_ip = Ip,
-        peer_udp_port = Port,
-        is_hole_punching = false
-    },
-    Peers3 = [Peer | Peers2],
+    Peers3 = [Peer2 | Peers2],
     State2 = State#state{peers = Peers3},
 
     error_logger:info_msg("[~p] ping peer ~p success: ~p.~n", [?MODULE, PeerId, tools:record_to_list(State2, record_info(fields, state))]),
