@@ -23,11 +23,7 @@ UDP base peer to peer communication.
 
    2) on peer1 machine, run "./cli" (configure file is "./cli.config")
 
-      p2p_client:online("Peer1Name").
-      
    3) on peer2 machine, run "./cli"
-
-      p2p_client:online("Peer2Name").
 
       p2p_client:connect_to_peer("Peer1Name").
 
